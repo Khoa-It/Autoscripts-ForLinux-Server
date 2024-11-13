@@ -1,0 +1,28 @@
+# Nội dung file Reverse Zone
+def generate_reverse_zone(domain,ip_address):
+    network = '.'.join(ip_address.split('.')[:3])
+    reverse_zone = '.'.join(network.split('.')[::-1]) + ".in-addr.arpa"
+    return f""" 
+zone "{reverse_zone}" IN {{
+    type master;
+    file "reverse.{domain}";
+    allow-update {{ none; }};
+}};
+"""
+last_octet = ip_address.split('.')[-1]
+reverse_zone_content = f"""
+$TTL 86400
+@   IN  SOA     ns1.{domain_name}. root.{domain_name}. (
+                2023111301 ; Serial
+                3600       ; Refresh
+                1800       ; Retry
+                604800     ; Expire
+                86400 )    ; Minimum TTL
+
+    IN  NS      ns1.{domain_name}.
+{last_octet}  IN  PTR     ns1.{domain_name}.
+"""
+
+create_zone_file(f"reverse.{domain_name}", reverse_zone_content)
+main_reverse_zone = '.'.join(main_network.split('.')[::-1]) + ".in-addr.arpa"
+os.system(f'named-checkzone {main_reverse_zone} /var/named/reverse.{domain_name}')

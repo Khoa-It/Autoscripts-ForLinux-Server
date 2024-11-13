@@ -78,7 +78,7 @@ def delete_domain_files(directory, extensions):
 name_conf_file = '/etc/named.conf'
 domain_path = '/var/named'
 resolv_file = '/etc/resolv.conf'
-ip_address = input('Enter your ip:')
+ip_address = input('Enter your ip: ')
 if not ip_address:
     print('Null value ip_address')
     exit()

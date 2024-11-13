@@ -22,16 +22,6 @@ nameserver 8.8.4.4
 """
     write_content_to_file('/etc/resolv.conf',content)
     
-def generate_reverse_zone(domain,ip_address):
-    network = '.'.join(ip_address.split('.')[:3])
-    reverse_zone = '.'.join(network.split('.')[::-1]) + ".in-addr.arpa"
-    return f""" 
-zone "{reverse_zone}" IN {{
-    type master;
-    file "reverse.{domain}";
-    allow-update {{ none; }};
-}};
-"""
 
 def generate_forward_zone(domain,ip_address):
     return f""" 
@@ -46,7 +36,6 @@ def create_zone_file(filename, content):
     path = f"/var/named/{filename}"
     write_content_to_file(path, content)
     
-
 # stop firewall
 print('Stop firewall ...')
 os.system('sudo systemctl stop firewalld')
@@ -80,7 +69,7 @@ overwrite_resolv_conf(domain_name, ip_address)
 
 content_for_named_file = read_file_to_array('/etc/named.conf')
 index_insert = len(content_for_named_file) - 2;
-content_for_named_file[index_insert:index_insert] = [generate_forward_zone(domain_name,ip_address), generate_reverse_zone(domain_name,ip_address)]
+content_for_named_file[index_insert:index_insert] = [generate_forward_zone(domain_name,ip_address)]
 write_content_to_file('/etc/named.conf', content_for_named_file)
 
 # create file zone and create content for that file
@@ -97,32 +86,14 @@ $TTL 86400
 @   IN  A       {ip_address}
 ns1 IN  A       {ip_address}
 """
-last_octet = ip_address.split('.')[-1]
-# Nội dung file Reverse Zone
-reverse_zone_content = f"""
-$TTL 86400
-@   IN  SOA     ns1.{domain_name}. root.{domain_name}. (
-                2023111301 ; Serial
-                3600       ; Refresh
-                1800       ; Retry
-                604800     ; Expire
-                86400 )    ; Minimum TTL
-
-    IN  NS      ns1.{domain_name}.
-{last_octet}  IN  PTR     ns1.{domain_name}.
-"""
 
 create_zone_file(f"forward.{domain_name}", forward_zone_content)
-create_zone_file(f"reverse.{domain_name}", reverse_zone_content)
 
 # check zone configuration
 main_network = '.'.join(ip_address.split('.')[:3])
-main_reverse_zone = '.'.join(main_network.split('.')[::-1]) + ".in-addr.arpa"
 os.system(f'named-checkzone {domain_name} /var/named/forward.{domain_name}')
-os.system(f'named-checkzone {main_reverse_zone} /var/named/reverse.{domain_name}')
 
 # restart dns service
 print('restart dns service...')
 os.system('systemctl enable named')
 os.system('systemctl restart named')
-
