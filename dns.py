@@ -1,5 +1,6 @@
 import subprocess
 import os
+from fn_file import *
 
 def my_log(res,success_mess, error_mess):
     if res.returncode == 0:
@@ -19,14 +20,7 @@ nameserver {dns_server_ip}
 nameserver 8.8.8.8
 nameserver 8.8.4.4
 """
-    try:
-        with open("/etc/resolv.conf", "w") as file:
-            file.write(content)
-        print("Successfully updated /etc/resolv.conf.")
-    except PermissionError:
-        print("Error: Permission denied. Please run the script with sudo.")
-    except Exception as e:
-        print(f"An error occurred while writing to the file: {e}")
+    write_content_to_file('/etc/resolv.conf',content)
     
 def generate_reverse_zone(domain,ip_address):
     network = '.'.join(ip_address.split('.')[:3])
@@ -38,6 +32,7 @@ zone "{reverse_zone}" IN {{
     allow-update {{ none; }};
 }};
 """
+
 def generate_forward_zone(domain,ip_address):
     return f""" 
 zone "{domain}" IN {{
@@ -48,15 +43,9 @@ zone "{domain}" IN {{
 """
 
 def create_zone_file(filename, content):
-    try:
-        path = f"/var/named/{filename}"
-        with open(path, "w") as file:
-            file.write(content)
-        print(f"Successfully created zone file: {path}")
-    except PermissionError:
-        print("Error: Permission denied. Please run the script with sudo.")
-    except Exception as e:
-        print(f"An error occurred while creating the file: {e}")
+    path = f"/var/named/{filename}"
+    write_content_to_file(path, content)
+    
 
 # stop firewall
 print('Stop firewall ...')
@@ -89,80 +78,10 @@ checkNullAndExitProgram(domain_name)
 # change name server file /etc/resolv.conf
 overwrite_resolv_conf(domain_name, ip_address)
 
-# change content file name.conf 
-content_file = f"""
-//
-// named.conf
-//
-// Provided by Red Hat bind package to configure the ISC BIND named(8) DNS
-// server as a caching only nameserver (as a localhost DNS resolver only).
-//
-// See /usr/share/doc/bind*/sample/ for example named configuration files.
-//
-options {{
-        listen-on port 53 {{ 127.0.0.1; {ip_address}; }};
-        listen-on-v6 port 53 {{ ::1; }};
-        directory       "/var/named";
-        forwarders {{8.8.8.8;8.8.4.4; }};
-        dump-file       "/var/named/data/cache_dump.db";
-        statistics-file "/var/named/data/named_stats.txt";
-        memstatistics-file "/var/named/data/named_mem_stats.txt";
-        secroots-file   "/var/named/data/named.secroots";
-        recursing-file  "/var/named/data/named.recursing";
-        allow-query     {{ localhost; }};
-
-        /* 
-         - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
-         - If you are building a RECURSIVE (caching) DNS server, you need to enable 
-           recursion. 
-         - If your recursive DNS server has a public IP address, you MUST enable access 
-           control to limit queries to your legitimate users. Failing to do so will
-           cause your server to become part of large scale DNS amplification 
-           attacks. Implementing BCP38 within your network would greatly
-           reduce such attack surface 
-        */
-        recursion yes;
-
-        dnssec-validation yes;
-
-        managed-keys-directory "/var/named/dynamic";
-        geoip-directory "/usr/share/GeoIP";
-
-        pid-file "/run/named/named.pid";
-        session-keyfile "/run/named/session.key";
-
-        /* https://fedoraproject.org/wiki/Changes/CryptoPolicy */
-        include "/etc/crypto-policies/back-ends/bind.config";
-}};
-
-logging {{
-        channel default_debug {{
-                file "data/named.run";
-                severity dynamic;
-        }};
-}};
-
-zone "." IN {{
-        type hint;
-        file "named.ca";
-}};
-
-{generate_forward_zone(domain_name, ip_address)}
-
-{generate_reverse_zone(domain_name, ip_address)}
-
-include "/etc/named.rfc1912.zones";
-include "/etc/named.root.key"; """
-  
-# Write content to /etc/named.conf
-try:
-    with open("/etc/named.conf", "w") as file:
-        file.write(content_file)
-    print("Successfully wrote configuration to /etc/named.conf.")
-except PermissionError:
-    print("Error: Permission denied. Please run the script with sudo.")
-except Exception as e:
-    print(f"An error occurred while writing to the file: {e}")
+content_for_named_file = read_file_to_array('/etc/named.conf')
+index_insert = len(content_for_named_file) - 2;
+content_for_named_file[index_insert:index_insert] = [generate_forward_zone(domain_name,ip_address), generate_reverse_zone(domain_name,ip_address)]
+write_content_to_file('/etc/named.conf', content_for_named_file)
 
 # create file zone and create content for that file
 forward_zone_content = f"""

@@ -11,10 +11,13 @@ def read_file_to_array(filepath):
         print(f"An error occurred while reading the file: {e}")
     return []  # Trả về mảng rỗng nếu có lỗi
 
-def write_array_to_file(filepath, content_array):
+def write_content_to_file(filepath, content):
     try:
         with open(filepath, "w") as file:
-            file.writelines(content_array)
+            if isinstance(content, list):
+                file.writelines(content)
+            else:
+                file.write(content)
         print(f"Successfully wrote to {filepath}.")
     except PermissionError:
         print(f"Error: Permission denied to write to the file {filepath}.")
